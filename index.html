@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Central de Chamados · TI</title>
+<style>
+  :root{
+    --ink:#101826;
+    --ink-soft:#3c4a5e;
+    --paper:#eef1f4;
+    --panel:#ffffff;
+    --line:#d6dce2;
+    --signal:#c9622a;
+    --signal-dim:#e9c4ab;
+    --ok:#2f7a4f;
+    --wait:#b8862c;
+    --mono: 'ui-monospace', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--sans);}
+  body{min-height:100vh;padding-bottom:40px;}
+
+  .topbar{
+    background:var(--ink);
+    color:#fff;
+    padding:18px 20px 16px;
+    position:sticky;top:0;z-index:10;
+  }
+  .topbar .brand{
+    font-family:var(--mono);
+    font-size:13px;
+    letter-spacing:.04em;
+    color:#9db0c9;
+    margin:0 0 4px;
+  }
+  .topbar h1{
+    margin:0;
+    font-size:20px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  .status-pill{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:11px;
+    color:#9db0c9;
+    margin-top:8px;
+  }
+  .status-pill.online::before{content:"● "; color:#5fbf7a;}
+  .status-pill.offline::before{content:"● "; color:#c94f4f;}
+  .tabs{
+    display:flex;
+    gap:0;
+    margin-top:14px;
+    border-bottom:1px solid #2b374a;
+  }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding:10px 4px;
+    font-size:14px;
+    color:#9db0c9;
+    background:none;
+    border:none;
+    border-bottom:2px solid transparent;
+    cursor:pointer;
+    font-family:var(--sans);
+  }
+  .tab.active{
+    color:#fff;
+    border-bottom-color:var(--signal);
+  }
+
+  .wrap{max-width:640px;margin:0 auto;padding:20px 16px;}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px;
+    margin-bottom:16px;
+  }
+
+  label{
+    display:block;
+    font-size:13px;
+    color:var(--ink-soft);
+    margin:14px 0 6px;
+  }
+  label:first-child{margin-top:0;}
+  input[type=text], textarea, select{
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:7px;
+    padding:11px 12px;
+    font-size:15px;
+    font-family:var(--sans);
+    background:#fbfcfd;
+    color:var(--ink);
+  }
+  input[type=text]:focus, textarea:focus, select:focus{
+    outline:2px solid var(--signal);
+    outline-offset:1px;
+    border-color:var(--signal);
+  }
+  textarea{resize:vertical;min-height:90px;}
+
+  .priority-row{display:flex;gap:8px;}
+  .priority-row input{display:none;}
+  .priority-row label{
+    flex:1;
+    text-align:center;
+    margin:0;
+    padding:10px 4px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    font-size:13px;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .priority-row input:checked + label{
+    border-color:var(--signal);
+    background:#fdf1ea;
+    color:var(--signal);
+    font-weight:600;
+  }
+
+  button.primary{
+    width:100%;
+    margin-top:20px;
+    background:var(--signal);
+    color:#fff;
+    border:none;
+    border-radius:7px;
+    padding:14px;
+    font-size:15px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  button.primary:active{background:#a94f1f;}
+  button.primary:disabled{background:#d6b6a2;cursor:default;}
+
+  .confirm{
+    display:none;
+    text-align:center;
+    padding:30px 10px 10px;
+  }
+  .confirm.show{display:block;}
+  .confirm .num{
+    font-family:var(--mono);
+    font-size:28px;
+    color:var(--signal);
+    margin:6px 0 2px;
+  }
+  .confirm p{color:var(--ink-soft);font-size:14px;margin:4px 0;}
+  .confirm button{
+    margin-top:18px;
+    background:none;
+    border:1px solid var(--line);
+    border-radius:7px;
+    padding:10px 18px;
+    font-size:14px;
+    color:var(--ink);
+    cursor:pointer;
+  }
+
+  /* painel */
+  .toolbar{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+    overflow-x:auto;
+  }
+  .filter{
+    flex:none;
+    padding:7px 13px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    font-size:13px;
+    color:var(--ink-soft);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .filter.active{
+    background:var(--ink);
+    color:#fff;
+    border-color:var(--ink);
+  }
+
+  .ticket{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-left:4px solid var(--line);
+    border-radius:8px;
+    padding:14px 16px;
+    margin-bottom:10px;
+  }
+  .ticket.status-aberto{border-left-color:var(--signal);}
+  .ticket.status-andamento{border-left-color:var(--wait);}
+  .ticket.status-resolvido{border-left-color:var(--ok);}
+
+  .ticket-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+  }
+  .ticket-id{font-family:var(--mono);font-size:12px;color:var(--ink-soft);}
+  .ticket-time{font-size:12px;color:var(--ink-soft);}
+  .ticket h3{margin:6px 0 4px;font-size:16px;}
+  .ticket .meta{font-size:13px;color:var(--ink-soft);margin-bottom:8px;}
+  .ticket .desc{font-size:14px;line-height:1.45;color:var(--ink);margin-bottom:12px;white-space:pre-wrap;}
+
+  .badge{
+    display:inline-block;
+    font-size:11px;
+    padding:3px 9px;
+    border-radius:20px;
+    font-weight:600;
+  }
+  .badge.p-alta{background:#fbe3d6;color:var(--signal);}
+  .badge.p-media{background:#f6e6c8;color:var(--wait);}
+  .badge.p-baixa{background:#e2ecec;color:#3d6e6e;}
+
+  .status-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .status-btn{
+    flex:1;
+    min-width:90px;
+    padding:8px 6px;
+    border-radius:6px;
+    border:1px solid var(--line);
+    background:#fbfcfd;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .status-btn.current{
+    background:var(--ink);
+    color:#fff;
+    border-color:var(--ink);
+  }
+
+  .empty{
+    text-align:center;
+    padding:50px 20px;
+    color:var(--ink-soft);
+  }
+  .empty .icon{font-size:32px;margin-bottom:10px;}
+
+  .gate{
+    text-align:center;
+    padding:40px 20px;
+  }
+  .gate input{text-align:center;letter-spacing:.3em;font-family:var(--mono);}
+  .gate p{color:var(--ink-soft);font-size:13px;margin-top:14px;}
+
+  .loading{text-align:center;padding:40px;color:var(--ink-soft);font-size:14px;}
+  .config-warning{
+    background:#fdf1ea;
+    border:1px solid var(--signal-dim);
+    color:#8a3f16;
+    padding:14px 16px;
+    border-radius:8px;
+    font-size:13px;
+    line-height:1.5;
+    margin-bottom:16px;
+  }
+  .config-warning code{
+    background:#fff;
+    padding:1px 5px;
+    border-radius:4px;
+    font-family:var(--mono);
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <p class="brand">SUPORTE&nbsp;TÉCNICO</p>
+  <h1>Central de Chamados</h1>
+  <span class="status-pill offline" id="conn-status">conectando…</span>
+  <div class="tabs">
+    <button class="tab active" data-tab="abrir">Abrir chamado</button>
+    <button class="tab" data-tab="painel">Painel (TI)</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="config-warning" id="config-warning" style="display:none;">
+    ⚠ Configure o Firebase antes de usar: abra o arquivo e preencha o objeto
+    <code>firebaseConfig</code> no final do HTML com as chaves do seu projeto
+    (veja o README que veio junto).
+  </div>
+
+  <!-- ABRIR CHAMADO -->
+  <div class="view active" id="view-abrir">
+    <div class="card" id="form-card">
+      <label for="f-nome">Seu nome</label>
+      <input type="text" id="f-nome" placeholder="Ex: Maria Souza">
+
+      <label for="f-setor">Setor / local</label>
+      <input type="text" id="f-setor" placeholder="Ex: Recepção, Sala 3, Financeiro">
+
+      <label for="f-categoria">Categoria</label>
+      <select id="f-categoria">
+        <option value="Computador/Notebook">Computador / Notebook</option>
+        <option value="Impressora">Impressora</option>
+        <option value="Rede/Internet">Rede / Internet</option>
+        <option value="Sistema/Acesso">Sistema / Acesso</option>
+        <option value="E-mail">E-mail</option>
+        <option value="Outro">Outro</option>
+      </select>
+
+      <label>Prioridade</label>
+      <div class="priority-row">
+        <input type="radio" name="prioridade" id="p-baixa" value="Baixa">
+        <label for="p-baixa">Baixa</label>
+        <input type="radio" name="prioridade" id="p-media" value="Média" checked>
+        <label for="p-media">Média</label>
+        <input type="radio" name="prioridade" id="p-alta" value="Alta">
+        <label for="p-alta">Alta</label>
+      </div>
+
+      <label for="f-desc">O que está acontecendo?</label>
+      <textarea id="f-desc" placeholder="Descreva o problema com o máximo de detalhes possível"></textarea>
+
+      <button class="primary" id="btn-enviar">Abrir chamado</button>
+    </div>
+
+    <div class="card confirm" id="confirm-card">
+      <p>Chamado registrado</p>
+      <div class="num" id="confirm-id">#000</div>
+      <p>A equipe de TI foi notificada e vai acompanhar por aqui.</p>
+      <button id="btn-novo">Abrir outro chamado</button>
+    </div>
+  </div>
+
+  <!-- PAINEL -->
+  <div class="view" id="view-painel">
+
+    <div class="gate" id="painel-gate">
+      <p style="color:var(--ink-soft);font-size:14px;">Área da equipe de TI</p>
+      <input type="text" id="gate-pin" placeholder="Código de acesso" maxlength="6">
+      <button class="primary" id="btn-entrar" style="margin-top:14px;">Entrar</button>
+      <p>Uso interno — não é uma senha de segurança, apenas separa a visão de acompanhamento. A proteção de verdade dos dados fica nas regras do Firestore (veja o README).</p>
+    </div>
+
+    <div id="painel-conteudo" style="display:none;">
+      <div class="toolbar">
+        <button class="filter active" data-filter="todos">Todos</button>
+        <button class="filter" data-filter="Aberto">Abertos</button>
+        <button class="filter" data-filter="Em andamento">Em andamento</button>
+        <button class="filter" data-filter="Resolvido">Resolvidos</button>
+      </div>
+      <div id="lista-chamados">
+        <div class="loading">Carregando chamados…</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+// ---------------------------------------------------------------
+// 1) COLE AQUI a configuração do seu projeto Firebase
+//    (Console Firebase → Configurações do projeto → Seus apps → SDK setup)
+// ---------------------------------------------------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyDuabvvso122ZQZ-N4PEVsP0-VuwK-DheQ",
+  authDomain: "chamados-ti-25f7c.firebaseapp.com",
+  projectId: "chamados-ti-25f7c",
+  storageBucket: "chamados-ti-25f7c.firebasestorage.app",
+  messagingSenderId: "834631030545",
+  appId: "1:834631030545:web:396749fda75ffb3f781eb0",
+  measurementId: "G-4S0BQ50CW6"
+};
+// ---------------------------------------------------------------
+
+const PIN = '1234'; // código simples só para separar a visão da equipe
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, onSnapshot, updateDoc, doc,
+  serverTimestamp, orderBy, query
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+let db = null;
+let chamadosCache = [];
+let filtroAtual = 'todos';
+let unsubscribe = null;
+
+function configuracaoPendente(){
+  return firebaseConfig.apiKey === "COLE_AQUI";
+}
+
+if(configuracaoPendente()){
+  document.getElementById('config-warning').style.display = 'block';
+  document.getElementById('conn-status').textContent = 'sem configuração';
+} else {
+  try{
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    document.getElementById('conn-status').textContent = 'online';
+    document.getElementById('conn-status').className = 'status-pill online';
+  }catch(e){
+    document.getElementById('conn-status').textContent = 'erro de conexão';
+  }
+}
+
+// ---------- utilidades ----------
+function formatarData(ts){
+  if(!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'}) + ' ' +
+         d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+}
+function classePrioridade(p){
+  if(p === 'Alta') return 'p-alta';
+  if(p === 'Média') return 'p-media';
+  return 'p-baixa';
+}
+function classeStatus(s){
+  if(s === 'Aberto') return 'status-aberto';
+  if(s === 'Em andamento') return 'status-andamento';
+  return 'status-resolvido';
+}
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+// ---------- abas ----------
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- abrir chamado ----------
+document.getElementById('btn-enviar').addEventListener('click', async ()=>{
+  if(configuracaoPendente()){
+    alert('O Firebase ainda não foi configurado neste arquivo.');
+    return;
+  }
+  const nome = document.getElementById('f-nome').value.trim();
+  const setor = document.getElementById('f-setor').value.trim();
+  const categoria = document.getElementById('f-categoria').value;
+  const prioridade = document.querySelector('input[name=prioridade]:checked').value;
+  const desc = document.getElementById('f-desc').value.trim();
+
+  if(!nome || !desc){
+    alert('Preencha seu nome e a descrição do problema.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-enviar');
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+
+  try{
+    const docRef = await addDoc(collection(db, 'chamados'), {
+      nome, setor, categoria, prioridade, desc,
+      status: 'Aberto',
+      criadoEm: serverTimestamp(),
+      atualizadoEm: serverTimestamp()
+    });
+    document.getElementById('form-card').style.display = 'none';
+    document.getElementById('confirm-card').classList.add('show');
+    document.getElementById('confirm-id').textContent = '#' + docRef.id.slice(-4).toUpperCase();
+  }catch(e){
+    alert('Não foi possível registrar o chamado agora. Verifique a conexão e tente novamente.');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Abrir chamado';
+  }
+});
+
+document.getElementById('btn-novo').addEventListener('click', ()=>{
+  document.getElementById('f-nome').value = '';
+  document.getElementById('f-setor').value = '';
+  document.getElementById('f-desc').value = '';
+  document.getElementById('f-categoria').selectedIndex = 0;
+  document.getElementById('p-media').checked = true;
+  document.getElementById('confirm-card').classList.remove('show');
+  document.getElementById('form-card').style.display = 'block';
+});
+
+// ---------- painel ----------
+document.getElementById('btn-entrar').addEventListener('click', ()=>{
+  const val = document.getElementById('gate-pin').value.trim();
+  if(val === PIN){
+    document.getElementById('painel-gate').style.display = 'none';
+    document.getElementById('painel-conteudo').style.display = 'block';
+    iniciarEscutaChamados();
+  }else{
+    alert('Código incorreto.');
+  }
+});
+
+document.querySelectorAll('.filter').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.filter').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    filtroAtual = btn.dataset.filter;
+    renderizarLista();
+  });
+});
+
+function iniciarEscutaChamados(){
+  if(configuracaoPendente()){
+    document.getElementById('lista-chamados').innerHTML =
+      '<div class="empty">Configure o Firebase no início do arquivo para o painel funcionar.</div>';
+    return;
+  }
+  if(unsubscribe) return; // já está escutando
+
+  const q = query(collection(db, 'chamados'), orderBy('criadoEm', 'desc'));
+  unsubscribe = onSnapshot(q, (snapshot)=>{
+    chamadosCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderizarLista();
+  }, (erro)=>{
+    document.getElementById('lista-chamados').innerHTML =
+      '<div class="empty">Não foi possível carregar os chamados. Confira as regras do Firestore.</div>';
+  });
+}
+
+function renderizarLista(){
+  const container = document.getElementById('lista-chamados');
+  let lista = chamadosCache;
+  if(filtroAtual !== 'todos'){
+    lista = chamadosCache.filter(c => c.status === filtroAtual);
+  }
+
+  if(lista.length === 0){
+    container.innerHTML = '<div class="empty"><div class="icon">—</div>Nenhum chamado por aqui.</div>';
+    return;
+  }
+
+  container.innerHTML = lista.map(c => `
+    <div class="ticket ${classeStatus(c.status)}">
+      <div class="ticket-head">
+        <span class="ticket-id">#${c.id.slice(-4).toUpperCase()}</span>
+        <span class="ticket-time">${formatarData(c.criadoEm)}</span>
+      </div>
+      <h3>${escapeHtml(c.categoria)}</h3>
+      <div class="meta">
+        ${escapeHtml(c.nome)}${c.setor ? ' · ' + escapeHtml(c.setor) : ''}
+        &nbsp;·&nbsp;<span class="badge ${classePrioridade(c.prioridade)}">${c.prioridade}</span>
+      </div>
+      <div class="desc">${escapeHtml(c.desc)}</div>
+      <div class="status-row">
+        <button class="status-btn ${c.status==='Aberto'?'current':''}" data-id="${c.id}" data-status="Aberto">Aberto</button>
+        <button class="status-btn ${c.status==='Em andamento'?'current':''}" data-id="${c.id}" data-status="Em andamento">Em andamento</button>
+        <button class="status-btn ${c.status==='Resolvido'?'current':''}" data-id="${c.id}" data-status="Resolvido">Resolvido</button>
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.status-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.id;
+      const novoStatus = btn.dataset.status;
+      try{
+        await updateDoc(doc(db, 'chamados', id), {
+          status: novoStatus,
+          atualizadoEm: serverTimestamp()
+        });
+      }catch(e){
+        alert('Não foi possível atualizar o status.');
+      }
+    });
+  });
+}
+</script>
+</body>
+</html>
